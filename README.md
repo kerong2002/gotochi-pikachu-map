@@ -1,0 +1,1 @@
+# gotochi-pikachu-map
