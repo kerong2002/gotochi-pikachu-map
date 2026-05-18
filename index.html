@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日本ご当地ピカチュウマップ｜地區限定皮卡丘 蒐集地圖</title>
+  <meta name="description" content="日本各地寶可夢中心限定皮卡丘絨毛娃娃地圖。標記、價格、Google Maps 連結，並可勾選蒐集進度。" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23FFCB05' stroke='%231A1A2E' stroke-width='3'/%3E%3Ccircle cx='22' cy='30' r='2.5' fill='%231A1A2E'/%3E%3Ccircle cx='42' cy='30' r='2.5' fill='%231A1A2E'/%3E%3Ccircle cx='18' cy='38' r='4' fill='%23FF4D4D'/%3E%3Ccircle cx='46' cy='38' r='4' fill='%23FF4D4D'/%3E%3C/svg%3E" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div class="brand-text">
+        <div class="t1">日本ご当地ピカチュウマップ</div>
+        <div class="t2">日本各地限定皮卡丘 · 蒐集地圖</div>
+      </div>
+    </div>
+    <div class="stats-pills">
+      <div class="stat-pill">
+        <span class="label">符合篩選</span>
+        <span class="num"><span id="stat-total">—</span></span>
+      </div>
+      <div class="stat-pill">
+        <span class="label">已蒐集</span>
+        <span class="num"><span id="stat-collected">—</span></span>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="app-main">
+
+    <aside class="sidebar">
+      <div class="side-section">
+        <h3>搜尋商品</h3>
+        <div class="search-wrap">
+          <input type="text" id="search-input" placeholder="商品名 / 店名 / 關鍵字" />
+        </div>
+      </div>
+
+      <div class="side-section">
+        <h3>類型</h3>
+        <div class="type-row" id="type-row"></div>
+      </div>
+
+      <div class="side-section">
+        <h3>地區</h3>
+        <div class="region-grid" id="region-grid"></div>
+      </div>
+
+      <div class="side-section">
+        <h3>價格範圍 (JPY)</h3>
+        <div class="price-row">
+          <input type="number" id="price-min" placeholder="最低" min="0" step="100" />
+          <span>～</span>
+          <input type="number" id="price-max" placeholder="最高" min="0" step="100" />
+        </div>
+        <div class="price-hint">留空表示不限｜NT$ 商品會以換算後 JPY 比較</div>
+      </div>
+
+      <div class="side-section">
+        <h3>蒐集狀態</h3>
+        <div class="toggle-row">
+          <span>隱藏已蒐集</span>
+          <div class="switch" id="hide-collected-switch"></div>
+        </div>
+      </div>
+
+      <div class="side-section">
+        <button class="reset-btn" id="reset-btn">↻ 重設所有篩選</button>
+      </div>
+
+      <div class="tips">
+        <strong>💡 使用提示</strong>
+        • 點地圖上的皮卡丘標記查看店鋪詳細<br/>
+        • 勾選「已蒐集」會自動存在本機<br/>
+        • 標記上的紅圈數字 = 該店限定款數<br/>
+        • 點面板右下角 Google 圖示開啟地圖
+      </div>
+    </aside>
+
+    <section class="map-wrap">
+      <div id="map"></div>
+      <div class="map-legend">
+        <h4>地區圖例</h4>
+        <div class="legend-grid" id="legend-content"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- DETAIL PANEL -->
+  <aside class="detail-panel" id="detail-panel">
+    <header class="detail-header">
+      <button class="close-btn" id="detail-close" aria-label="關閉">✕</button>
+      <div class="region-badge" id="detail-region">—</div>
+      <h2 id="detail-name-ja">—</h2>
+      <div class="name-zh" id="detail-name-zh">—</div>
+      <div class="address" id="detail-address">—</div>
+    </header>
+    <a class="detail-gmaps" id="detail-gmaps" href="#" target="_blank" rel="noopener">
+      <span class="icon">G</span>
+      在 Google Maps 中開啟此店鋪 →
+    </a>
+    <div class="detail-body" id="detail-body"></div>
+  </aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const legend = document.getElementById('legend-content');
+      legend.innerHTML = REGIONS.filter(r => r.id !== 'all').map(r => `
+        <div class="legend-row">
+          <div class="legend-dot" style="background:${r.color}"></div>
+          ${r.label}
+        </div>
+      `).join('');
+    });
+  </script>
+</body>
+</html>
