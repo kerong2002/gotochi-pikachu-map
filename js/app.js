@@ -3,17 +3,27 @@
  */
 
 const LS_KEY = 'pika-map-collected-v2';
-const LS_SEEDED_KEY = 'pika-map-seeded-v2';
+const LS_SEEDED_PREFIX = 'pika-map-seeded-';
 
-// 首次載入時，把 CSV 內已標記為「收服」的商品自動寫入 localStorage
+// 為每個標記 collected:true 的商品，第一次看到時就匯入 localStorage
+// 用 per-id 的旗標，所以日後新增的 collected:true 商品也會被自動加入
 function seedCollectedFromData() {
-  if (localStorage.getItem(LS_SEEDED_KEY)) return null;
-  const preset = PLUSHES.filter(p => p.collected).map(p => p.id);
-  if (preset.length > 0 && !localStorage.getItem(LS_KEY)) {
-    localStorage.setItem(LS_KEY, JSON.stringify(preset));
+  let saved;
+  try {
+    saved = new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'));
+  } catch (e) {
+    saved = new Set();
   }
-  localStorage.setItem(LS_SEEDED_KEY, '1');
-  return preset;
+  let changed = false;
+  PLUSHES.forEach(p => {
+    if (!p.collected) return;
+    const flagKey = LS_SEEDED_PREFIX + p.id;
+    if (localStorage.getItem(flagKey)) return;  // 已經 seed 過這個 ID
+    saved.add(p.id);
+    localStorage.setItem(flagKey, '1');
+    changed = true;
+  });
+  if (changed) localStorage.setItem(LS_KEY, JSON.stringify([...saved]));
 }
 
 const state = {
@@ -23,6 +33,7 @@ const state = {
   priceMax: 9999,
   searchTerm: '',
   hideCollected: false,
+  markerMode: 'all',   // 'all' | 'collected' | 'uncollected'
   collected: new Set(),
   activeStoreId: null,
   markers: {}
@@ -145,6 +156,35 @@ function initMap() {
   });
 }
 
+// Compute marker badge count based on markerMode
+function badgeCountForStore(storeId) {
+  const all = PLUSHES.filter(p => p.storeId === storeId);
+  if (state.markerMode === 'collected') {
+    return all.filter(p => state.collected.has(p.id)).length;
+  }
+  if (state.markerMode === 'uncollected') {
+    return all.filter(p => !state.collected.has(p.id)).length;
+  }
+  return all.length;
+}
+
+// Update marker badges (numbers + colors) without rebuilding markers
+function updateMarkerBadges() {
+  STORES.forEach(store => {
+    const marker = state.markers[store.id];
+    if (!marker) return;
+    const el = marker.getElement();
+    if (!el) return;
+    const badge = el.querySelector('.count-badge');
+    if (!badge) return;
+    const n = badgeCountForStore(store.id);
+    badge.textContent = n;
+    badge.classList.toggle('badge-zero', n === 0);
+    badge.classList.toggle('badge-collected', state.markerMode === 'collected' && n > 0);
+    badge.classList.toggle('badge-uncollected', state.markerMode === 'uncollected' && n > 0);
+  });
+}
+
 function updateMapMarkers() {
   const visibleStoreIds = new Set(storesWithMatches().map(s => s.id));
   Object.entries(state.markers).forEach(([storeId, marker]) => {
@@ -247,6 +287,7 @@ function toggleCollected(plushId) {
   }
   saveCollected();
   updateStats();
+  updateMarkerBadges();
   if (state.activeStoreId) openStoreDetail(state.activeStoreId);
   if (state.hideCollected) updateMapMarkers();
 }
@@ -275,6 +316,7 @@ function renderRegions() {
     btn.addEventListener('click', () => {
       state.activeRegion = btn.dataset.region;
       renderRegions();
+      if (window.__renderLegend) window.__renderLegend();
       updateMapMarkers();
       updateStats();
     });
@@ -309,6 +351,26 @@ function updateStats() {
 }
 
 function setupSidebar() {
+  // Marker badge mode
+  const modeRow = document.getElementById('marker-mode-row');
+  const modes = [
+    { id: 'all',          label: '全部' },
+    { id: 'uncollected',  label: '未蒐集' },
+    { id: 'collected',    label: '已蒐集' }
+  ];
+  const renderModes = () => {
+    modeRow.innerHTML = modes.map(m => `
+      <button class="mode-chip ${m.id === state.markerMode ? 'active' : ''}" data-mode="${m.id}">${m.label}</button>
+    `).join('');
+    modeRow.querySelectorAll('.mode-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.markerMode = btn.dataset.mode;
+        renderModes();
+        updateMarkerBadges();
+      });
+    });
+  };
+  renderModes();
   const search = document.getElementById('search-input');
   search.addEventListener('input', e => {
     state.searchTerm = e.target.value;
@@ -347,6 +409,7 @@ function setupSidebar() {
     pMax.value = '';
     sw.classList.remove('on');
     renderRegions();
+    if (window.__renderLegend) window.__renderLegend();
     renderTypes();
     updateMapMarkers();
     updateStats();
@@ -365,6 +428,7 @@ window.addEventListener('DOMContentLoaded', () => {
   renderTypes();
   setupSidebar();
   updateStats();
+  updateMarkerBadges();
 });
 
 window.openStoreDetail = openStoreDetail;

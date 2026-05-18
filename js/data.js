@@ -620,6 +620,26 @@ const PLUSHES = [
     collected: true
   },
   {
+    id: 'wedding-groom',
+    storeId: 'taipei',
+    nameZh: '婚禮皮卡丘（公）',
+    nameJa: 'ウェディングピカチュウ（男の子）',
+    priceText: 'NT$880', priceJPY: 3960, currency: 'TWD',
+    type: '活動',
+    image: 'images/wedding-groom.png',
+    collected: true
+  },
+  {
+    id: 'wedding-bride',
+    storeId: 'taipei',
+    nameZh: '婚禮皮卡丘（母）',
+    nameJa: 'ウェディングピカチュウ（女の子）',
+    priceText: 'NT$1,000', priceJPY: 4500, currency: 'TWD',
+    type: '活動',
+    image: 'images/wedding-bride.png',
+    collected: true
+  },
+  {
     id: 'flying',
     storeId: 'taipei',
     nameZh: '飛翔皮卡丘',
@@ -629,7 +649,6 @@ const PLUSHES = [
     image: 'images/image-14.png',
     collected: true
   },
-
   // ========== 海外 - 新竹 ==========
   {
     id: 'pika-diner',

@@ -55,6 +55,11 @@
       </div>
 
       <div class="side-section">
+        <h3>標記顯示</h3>
+        <div class="type-row" id="marker-mode-row"></div>
+      </div>
+
+      <div class="side-section">
         <h3>類型</h3>
         <div class="type-row" id="type-row"></div>
       </div>
@@ -127,12 +132,27 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const legend = document.getElementById('legend-content');
-      legend.innerHTML = REGIONS.filter(r => r.id !== 'all').map(r => `
-        <div class="legend-row">
-          <div class="legend-dot" style="background:${r.color}"></div>
-          ${r.label}
-        </div>
-      `).join('');
+      const renderLegend = () => {
+        legend.innerHTML = REGIONS.filter(r => r.id !== 'all').map(r => `
+          <button class="legend-row ${r.id === state.activeRegion ? 'active' : ''}" data-region="${r.id}">
+            <div class="legend-dot" style="background:${r.color}"></div>
+            ${r.label}
+          </button>
+        `).join('');
+        legend.querySelectorAll('.legend-row').forEach(btn => {
+          btn.addEventListener('click', () => {
+            // Toggle: clicking active region resets to "all"
+            state.activeRegion = (state.activeRegion === btn.dataset.region) ? 'all' : btn.dataset.region;
+            renderRegions();
+            renderLegend();
+            updateMapMarkers();
+            updateStats();
+          });
+        });
+      };
+      renderLegend();
+      // Re-render when sidebar region buttons change too
+      window.__renderLegend = renderLegend;
     });
   </script>
 </body>

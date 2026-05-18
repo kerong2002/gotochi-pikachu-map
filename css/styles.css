@@ -268,6 +268,26 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
+/* Mode chips (same look as type chips, different active color) */
+.mode-chip {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 6px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  transition: all 0.15s;
+}
+.mode-chip.active {
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.mode-chip[data-mode="collected"].active { color: #1E7A45; }
+.mode-chip[data-mode="uncollected"].active { color: var(--poke-red); }
+
 /* Price */
 .price-row {
   display: flex;
@@ -401,6 +421,21 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   gap: 6px;
   font-weight: 600;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.15s;
+}
+.legend-row:hover { background: var(--gray-100); }
+.legend-row.active {
+  background: var(--ink);
+  color: var(--white);
 }
 .legend-dot {
   width: 10px;
@@ -436,6 +471,17 @@ button { font-family: inherit; cursor: pointer; }
   place-items: center;
   border: 2px solid var(--white);
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+.pika-marker .count-badge.badge-collected {
+  background: #1E9551;
+}
+.pika-marker .count-badge.badge-uncollected {
+  background: var(--poke-red);
+}
+.pika-marker .count-badge.badge-zero {
+  background: var(--gray-300);
+  color: var(--ink-soft);
 }
 .pika-marker.dim { opacity: 0.18; }
 .pika-marker.dim:hover { opacity: 0.5; }
