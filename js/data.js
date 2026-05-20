@@ -158,9 +158,9 @@ const STORES = [
     region: 'cafe',
     name: '寶可夢咖啡廳 日本橋本店',
     nameJa: 'ポケモンカフェ 日本橋本店',
-    address: '東京都中央区日本橋2-11-2 日本橋高島屋S.C. 東館 5F',
-    lat: 35.6820,
-    lng: 139.7748,
+    address: '東京都中央区日本橋2-11-2 日本橋高島屋S.C. 東館 5F（與東京DX同棟同層）',
+    lat: 35.6816,
+    lng: 139.7770,
     gmaps: 'https://maps.google.com/?q=ポケモンカフェ+日本橋'
   },
 

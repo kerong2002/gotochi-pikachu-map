@@ -28,6 +28,23 @@
         <div class="t2">日本各地限定皮卡丘 · 蒐集地圖</div>
       </div>
     </div>
+
+    <!-- View Mode Switcher -->
+    <div class="view-switcher" id="view-switcher">
+      <button class="view-btn" data-view="map">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15M15 6v15"/></svg>
+        地圖
+      </button>
+      <button class="view-btn active" data-view="gallery">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        圖庫
+      </button>
+      <button class="view-btn" data-view="list">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+        清單
+      </button>
+    </div>
+
     <div class="stats-pills">
       <div class="stat-pill">
         <span class="label">符合篩選</span>
@@ -55,7 +72,7 @@
       </div>
 
       <div class="side-section">
-        <h3>標記顯示</h3>
+        <h3>蒐集狀態（全域篩選）</h3>
         <div class="type-row" id="marker-mode-row"></div>
       </div>
 
@@ -100,11 +117,58 @@
       </div>
     </aside>
 
-    <section class="map-wrap">
-      <div id="map"></div>
-      <div class="map-legend">
-        <h4>地區圖例</h4>
-        <div class="legend-grid" id="legend-content"></div>
+    <section class="content-wrap">
+      <!-- Map View -->
+      <div class="view-pane" data-view-pane="map">
+        <div id="map"></div>
+        <div class="map-legend">
+          <h4>地區圖例</h4>
+          <div class="legend-grid" id="legend-content"></div>
+        </div>
+      </div>
+
+      <!-- Gallery View -->
+      <div class="view-pane active" data-view-pane="gallery">
+        <div class="gallery-header">
+          <span class="result-count" id="gallery-count">—</span>
+          <span class="sort-label">排序：</span>
+          <select class="sort-select" id="gallery-sort">
+            <option value="region">依地區</option>
+            <option value="store">依店鋪</option>
+            <option value="price-asc">價格 ↑</option>
+            <option value="price-desc">價格 ↓</option>
+            <option value="name">依名稱</option>
+          </select>
+        </div>
+        <div class="gallery-grid" id="gallery-grid"></div>
+        <div class="empty-state" id="gallery-empty" style="display:none;">
+          <div class="ico">🔍</div>
+          <div class="msg">沒有符合條件的皮卡丘</div>
+        </div>
+      </div>
+
+      <!-- List View -->
+      <div class="view-pane" data-view-pane="list">
+        <div class="list-wrap">
+          <table class="data-list">
+            <thead>
+              <tr>
+                <th class="th-img"></th>
+                <th class="th-name" data-sort="name">名稱</th>
+                <th class="th-region" data-sort="region">地區</th>
+                <th class="th-store" data-sort="store">店鋪</th>
+                <th class="th-type" data-sort="type">類型</th>
+                <th class="th-price" data-sort="price">價格</th>
+                <th class="th-action">蒐集</th>
+              </tr>
+            </thead>
+            <tbody id="list-tbody"></tbody>
+          </table>
+          <div class="empty-state" id="list-empty" style="display:none;">
+            <div class="ico">🔍</div>
+            <div class="msg">沒有符合條件的皮卡丘</div>
+          </div>
+        </div>
       </div>
     </section>
   </main>

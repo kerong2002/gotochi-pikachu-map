@@ -34,9 +34,13 @@ const state = {
   searchTerm: '',
   hideCollected: false,
   markerMode: 'all',   // 'all' | 'collected' | 'uncollected'
+  view: 'gallery',     // 'map' | 'gallery' | 'list'
+  gallerySort: 'region',
+  listSort: { key: 'region', asc: true },
   collected: new Set(),
   activeStoreId: null,
-  markers: {}
+  markers: {},
+  mapReady: false
 };
 
 function loadCollected() {
@@ -53,8 +57,194 @@ function saveCollected() {
 }
 
 /* ============================================
-   MAP MARKER SVG
+   VIEW SWITCHING
    ============================================ */
+function switchView(v) {
+  state.view = v;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  document.querySelectorAll('.view-pane').forEach(p => p.classList.toggle('active', p.dataset.viewPane === v));
+  if (v === 'map') {
+    // Defer init/invalidate to next frame so the pane has its layout
+    requestAnimationFrame(() => {
+      if (!state.mapReady) {
+        initMap();
+        state.mapReady = true;
+      }
+      if (map) {
+        map.invalidateSize();
+        updateMarkerBadges();
+      }
+    });
+  } else if (v === 'gallery') {
+    renderGallery();
+  } else if (v === 'list') {
+    renderList();
+  }
+}
+
+/* ============================================
+   GALLERY VIEW
+   ============================================ */
+function getRegionMeta(regionId) {
+  return REGIONS.find(r => r.id === regionId) || { label: '', color: '#999' };
+}
+function getTypeColor(type) {
+  const t = TYPES.find(tt => tt.id === type);
+  return t ? t.color : '#999';
+}
+
+function sortPlushes(arr, sortKey) {
+  const copy = [...arr];
+  copy.sort((a, b) => {
+    const sa = STORES.find(s => s.id === a.storeId) || {};
+    const sb = STORES.find(s => s.id === b.storeId) || {};
+    if (sortKey === 'price-asc') return a.priceJPY - b.priceJPY;
+    if (sortKey === 'price-desc') return b.priceJPY - a.priceJPY;
+    if (sortKey === 'name') return a.nameZh.localeCompare(b.nameZh, 'zh-Hant');
+    if (sortKey === 'store') return (sa.name || '').localeCompare(sb.name || '', 'zh-Hant');
+    // default: region (use REGIONS order) then store
+    const ai = REGIONS.findIndex(r => r.id === sa.region);
+    const bi = REGIONS.findIndex(r => r.id === sb.region);
+    if (ai !== bi) return ai - bi;
+    return (sa.name || '').localeCompare(sb.name || '', 'zh-Hant');
+  });
+  return copy;
+}
+
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  const empty = document.getElementById('gallery-empty');
+  const count = document.getElementById('gallery-count');
+
+  const plushes = sortPlushes(filteredPlushes(), state.gallerySort);
+  count.textContent = plushes.length;
+
+  if (plushes.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = plushes.map(p => {
+    const store = STORES.find(s => s.id === p.storeId);
+    const region = getRegionMeta(store?.region);
+    const typeColor = getTypeColor(p.type);
+    const isCollected = state.collected.has(p.id);
+    return `
+      <div class="gallery-card ${isCollected ? 'collected' : ''}" data-plush="${p.id}" data-store="${p.storeId}">
+        <div class="gc-img">
+          <img src="${p.image}" alt="${p.nameZh}" loading="lazy"
+               onerror="this.style.display='none'; this.parentElement.innerHTML='📷';"/>
+        </div>
+        <div class="gc-body">
+          <div class="gc-name">${p.nameZh}</div>
+          <div class="gc-price">${p.priceText}</div>
+          <div class="gc-tags">
+            <span class="gc-tag" style="background:${region.color}22; color:${region.color};">${region.label}</span>
+            <span class="gc-tag" style="background:${typeColor}1A; color:${typeColor};">${p.type}</span>
+          </div>
+          <div class="gc-store">${store ? store.name : ''}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.gallery-card').forEach(card => {
+    card.addEventListener('click', () => openStoreDetail(card.dataset.store, card.dataset.plush));
+  });
+}
+
+/* ============================================
+   LIST VIEW
+   ============================================ */
+function renderList() {
+  const tbody = document.getElementById('list-tbody');
+  const empty = document.getElementById('list-empty');
+
+  let plushes = filteredPlushes();
+  // sort
+  const { key, asc } = state.listSort;
+  plushes = [...plushes].sort((a, b) => {
+    const sa = STORES.find(s => s.id === a.storeId) || {};
+    const sb = STORES.find(s => s.id === b.storeId) || {};
+    let cmp = 0;
+    switch (key) {
+      case 'name':  cmp = a.nameZh.localeCompare(b.nameZh, 'zh-Hant'); break;
+      case 'store': cmp = (sa.name || '').localeCompare(sb.name || '', 'zh-Hant'); break;
+      case 'type':  cmp = a.type.localeCompare(b.type, 'zh-Hant'); break;
+      case 'price': cmp = a.priceJPY - b.priceJPY; break;
+      case 'region': {
+        const ai = REGIONS.findIndex(r => r.id === sa.region);
+        const bi = REGIONS.findIndex(r => r.id === sb.region);
+        cmp = ai - bi;
+        if (cmp === 0) cmp = (sa.name || '').localeCompare(sb.name || '', 'zh-Hant');
+        break;
+      }
+    }
+    return asc ? cmp : -cmp;
+  });
+
+  if (plushes.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = plushes.map(p => {
+      const store = STORES.find(s => s.id === p.storeId);
+      const region = getRegionMeta(store?.region);
+      const typeColor = getTypeColor(p.type);
+      const isCollected = state.collected.has(p.id);
+      return `
+        <tr class="${isCollected ? 'collected' : ''}" data-plush="${p.id}" data-store="${p.storeId}">
+          <td>
+            <div class="li-img"><img src="${p.image}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='📷';"/></div>
+          </td>
+          <td>
+            <div class="li-name">${p.nameZh}</div>
+            <div class="li-name-ja">${p.nameJa}</div>
+          </td>
+          <td><span class="li-tag" style="background:${region.color}22; color:${region.color};">${region.label}</span></td>
+          <td>${store ? store.name : ''}</td>
+          <td><span class="li-tag" style="background:${typeColor}1A; color:${typeColor};">${p.type}</span></td>
+          <td><span class="li-price">${p.priceText}</span></td>
+          <td>
+            <button class="li-collect ${isCollected ? 'on' : ''}" data-collect="${p.id}" title="${isCollected ? '已蒐集' : '標記蒐集'}">${isCollected ? '✓' : '＋'}</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Row click → open detail; collect button click → toggle
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('.li-collect')) return;
+        openStoreDetail(tr.dataset.store, tr.dataset.plush);
+      });
+    });
+    tbody.querySelectorAll('.li-collect').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleCollected(btn.dataset.collect);
+      });
+    });
+  }
+
+  // Update header sort indicator
+  document.querySelectorAll('.data-list th[data-sort]').forEach(th => {
+    const isSorted = th.dataset.sort === key;
+    th.classList.toggle('sorted', isSorted);
+    th.classList.toggle('asc', isSorted && asc);
+  });
+}
+
+/* ============================================
+   RE-RENDER ALL VIEWS WHEN FILTERS CHANGE
+   ============================================ */
+function rerenderActiveView() {
+  if (state.view === 'gallery') renderGallery();
+  else if (state.view === 'list') renderList();
+}
 function buildMarkerSVG(color) {
   return `
     <svg viewBox="0 0 44 50" class="pin-body" xmlns="http://www.w3.org/2000/svg">
@@ -86,6 +276,9 @@ function filteredPlushes() {
     if (state.activeType !== 'all' && p.type !== state.activeType) return false;
     if (p.priceJPY < state.priceMin || p.priceJPY > state.priceMax) return false;
     if (state.hideCollected && state.collected.has(p.id)) return false;
+    // markerMode is now a global filter: 'collected' = only collected, 'uncollected' = only not, 'all' = both
+    if (state.markerMode === 'collected' && !state.collected.has(p.id)) return false;
+    if (state.markerMode === 'uncollected' && state.collected.has(p.id)) return false;
     if (term) {
       const hay = (p.nameJa + ' ' + p.nameZh + ' ' + store.name + ' ' + (store.nameJa || '')).toLowerCase();
       if (!hay.includes(term)) return false;
@@ -170,6 +363,7 @@ function badgeCountForStore(storeId) {
 
 // Update marker badges (numbers + colors) without rebuilding markers
 function updateMarkerBadges() {
+  if (!state.mapReady) return;
   STORES.forEach(store => {
     const marker = state.markers[store.id];
     if (!marker) return;
@@ -186,6 +380,7 @@ function updateMarkerBadges() {
 }
 
 function updateMapMarkers() {
+  if (!state.mapReady) return;
   const visibleStoreIds = new Set(storesWithMatches().map(s => s.id));
   Object.entries(state.markers).forEach(([storeId, marker]) => {
     const el = marker.getElement();
@@ -203,7 +398,7 @@ function updateMapMarkers() {
 /* ============================================
    DETAIL PANEL
    ============================================ */
-function openStoreDetail(storeId) {
+function openStoreDetail(storeId, highlightPlushId) {
   const store = STORES.find(s => s.id === storeId);
   if (!store) return;
   state.activeStoreId = storeId;
@@ -228,13 +423,24 @@ function openStoreDetail(storeId) {
       <span>限定皮卡丘 · ${plushes.length} 款</span>
       <span class="collected-badge">已蒐集 ${collectedCount}/${plushes.length}</span>
     </div>`;
-    body.innerHTML = sectionTitle + plushes.map(p => plushCardHTML(p)).join('');
+    body.innerHTML = sectionTitle + plushes.map(p => plushCardHTML(p, p.id === highlightPlushId)).join('');
   }
 
   document.getElementById('detail-panel').classList.add('open');
 
-  if (map) {
+  if (state.view === 'map' && map) {
     map.setView([store.lat, store.lng], Math.max(map.getZoom(), 8), { animate: true });
+    map.closePopup();
+  }
+
+  // Scroll highlighted plush into view inside the panel
+  if (highlightPlushId) {
+    setTimeout(() => {
+      const target = body.querySelector(`[data-plush="${highlightPlushId}"]`);
+      if (target) {
+        body.scrollTo({ top: target.offsetTop - 16, behavior: 'smooth' });
+      }
+    }, 50);
   }
 }
 
@@ -251,13 +457,13 @@ function closeDetail() {
   state.activeStoreId = null;
 }
 
-function plushCardHTML(p) {
+function plushCardHTML(p, highlight) {
   const isCollected = state.collected.has(p.id);
   const typeMeta = TYPES.find(t => t.id === p.type);
   const typeColor = typeMeta ? typeMeta.color : '#999';
 
   return `
-    <div class="plush-card ${isCollected ? 'collected' : ''}" data-plush="${p.id}">
+    <div class="plush-card ${isCollected ? 'collected' : ''} ${highlight ? 'highlight' : ''}" data-plush="${p.id}">
       <div class="plush-img">
         <img src="${p.image}" alt="${p.nameZh}" loading="lazy"
              onerror="this.style.display='none'; this.parentElement.classList.add('no-img');"/>
@@ -288,6 +494,7 @@ function toggleCollected(plushId) {
   saveCollected();
   updateStats();
   updateMarkerBadges();
+  rerenderActiveView();
   if (state.activeStoreId) openStoreDetail(state.activeStoreId);
   if (state.hideCollected) updateMapMarkers();
 }
@@ -319,6 +526,7 @@ function renderRegions() {
       if (window.__renderLegend) window.__renderLegend();
       updateMapMarkers();
       updateStats();
+      rerenderActiveView();
     });
   });
 }
@@ -336,6 +544,7 @@ function renderTypes() {
       renderTypes();
       updateMapMarkers();
       updateStats();
+      rerenderActiveView();
     });
   });
 }
@@ -366,7 +575,10 @@ function setupSidebar() {
       btn.addEventListener('click', () => {
         state.markerMode = btn.dataset.mode;
         renderModes();
+        updateMapMarkers();
         updateMarkerBadges();
+        updateStats();
+        rerenderActiveView();
       });
     });
   };
@@ -376,6 +588,7 @@ function setupSidebar() {
     state.searchTerm = e.target.value;
     updateMapMarkers();
     updateStats();
+    rerenderActiveView();
   });
 
   const pMin = document.getElementById('price-min');
@@ -385,6 +598,7 @@ function setupSidebar() {
     state.priceMax = parseInt(pMax.value, 10) || 9999;
     updateMapMarkers();
     updateStats();
+    rerenderActiveView();
   };
   pMin.addEventListener('input', apply);
   pMax.addEventListener('input', apply);
@@ -395,11 +609,13 @@ function setupSidebar() {
     sw.classList.toggle('on', state.hideCollected);
     updateMapMarkers();
     updateStats();
+    rerenderActiveView();
   });
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     state.activeRegion = 'all';
     state.activeType = 'all';
+    state.markerMode = 'all';
     state.priceMin = 0;
     state.priceMax = 9999;
     state.searchTerm = '';
@@ -411,8 +627,40 @@ function setupSidebar() {
     renderRegions();
     if (window.__renderLegend) window.__renderLegend();
     renderTypes();
+    renderModes();
     updateMapMarkers();
+    updateMarkerBadges();
     updateStats();
+    rerenderActiveView();
+  });
+
+  // View switcher
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  // Gallery sort
+  const gallerySort = document.getElementById('gallery-sort');
+  if (gallerySort) {
+    gallerySort.value = state.gallerySort;
+    gallerySort.addEventListener('change', e => {
+      state.gallerySort = e.target.value;
+      renderGallery();
+    });
+  }
+
+  // List sort by clicking headers
+  document.querySelectorAll('.data-list th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (state.listSort.key === key) {
+        state.listSort.asc = !state.listSort.asc;
+      } else {
+        state.listSort.key = key;
+        state.listSort.asc = true;
+      }
+      renderList();
+    });
   });
 
   document.getElementById('detail-close').addEventListener('click', closeDetail);
@@ -423,12 +671,14 @@ function setupSidebar() {
    ============================================ */
 window.addEventListener('DOMContentLoaded', () => {
   loadCollected();
-  initMap();
   renderRegions();
   renderTypes();
   setupSidebar();
   updateStats();
-  updateMarkerBadges();
+  // Render the default view (gallery). Map is lazy-init on first switch.
+  if (state.view === 'gallery') renderGallery();
+  else if (state.view === 'list') renderList();
+  else { initMap(); state.mapReady = true; updateMarkerBadges(); }
 });
 
 window.openStoreDetail = openStoreDetail;
